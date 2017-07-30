@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -37,6 +38,7 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		serv.SimpleHttpResponse(w, http.StatusBadRequest, fmt.Sprintf(`The 'video' parameter must match "%s"`, videoIdRegex))
 		return
 	}
+	log.Printf("Add received for %s\n", videoId)
 
 	audioStreams, title, err := getAudioStreams(videoId)
 	if err != nil || audioStreams == nil {
@@ -62,17 +64,20 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	toQueue := util.QueuedAudioInfo{
-		AudioFileInfo: &util.AudioFileInfo{
-			Id:       videoId,
-			Filename: title,
-			Bitrate:  bitrate,
-			Length:   length,
-			Stored:   false,
-		},
-		Url: audioInfo["url"][0],
+	toQueue := util.AudioFileInfo{
+		Id:       videoId,
+		Filename: title,
+		Bitrate:  bitrate,
+		Length:   length,
+		Stored:   false,
+		Url:      audioInfo["url"][0],
 	}
 
-	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%+v", toQueue.AudioFileInfo))
-	util.EnqueueAudioInfo(&toQueue)
+	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%+v", toQueue))
+	go util.EnqueueAudioInfo(&toQueue)
+}
+
+func NextHandler(w http.ResponseWriter, r *http.Request) {
+	serv.SimpleHttpResponse(w, http.StatusOK, "Attempting to play next audio file")
+	go util.PlayNext()
 }

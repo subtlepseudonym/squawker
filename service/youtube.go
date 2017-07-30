@@ -160,7 +160,3 @@ func parseAudioInfo(audioStreamsInfo []string) (map[string][]string, error) {
 		return nil, fmt.Errorf("No supported tracks available")
 	}
 }
-
-func getAudioTrack(url string) {
-
-}

@@ -15,6 +15,7 @@ func main() {
 	serv.LogPublicIpAddress(nil, util.GetPort())
 
 	http.HandleFunc("/add", service.AddHandler)
+	http.HandleFunc("/next", service.NextHandler)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", util.GetPort()), nil))
 }

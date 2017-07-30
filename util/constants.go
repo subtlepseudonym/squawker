@@ -2,6 +2,7 @@ package util
 
 import (
 	"flag"
+	"os"
 )
 
 const (
@@ -13,7 +14,7 @@ const (
 
 const defaultVerbosity = VerbosityNormal
 const defaultPort = 15567
-const defaultQueueSize = 25                // how many QueuedAudioFile objects can be in the incoming queue at a time (higher value means fewer blocking goroutines)
+const defaultQueueSize = 2                 // size of queue waiting to be played, number of downloaded files is at most (queueSize + numFilesMaintained + 1)
 const defaultLogSize = 25                  // how many AudioFileInfo objects to keep after they've been played
 const defaultNumFilesMaintained = 5        // maintain the last 5 songs played, delete anything older
 const defaultMaxSongLength = 600           // length in seconds
@@ -78,4 +79,11 @@ func init() {
 	} else if q {
 		verbosity = VerbosityQuiet
 	}
+
+	// Making fileDirectory absolute
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	fileDirectory = wd + "/" + fileDirectory
 }
