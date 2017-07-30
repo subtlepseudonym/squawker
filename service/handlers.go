@@ -40,8 +40,8 @@ func NextHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: toss this info into a queue, then do this just in time
-	rawVideoInfo, err := getVideoInfo(videoId)
-	if err != nil || rawVideoInfo == "" {
+	rawVideoInfo, err := getAudioStreams(videoId)
+	if err != nil || rawVideoInfo == nil {
 		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error getting video info")
 		return
 	}
@@ -56,41 +56,50 @@ func NextHandler(w http.ResponseWriter, r *http.Request) {
 	serv.SimpleHttpResponse(w, http.StatusOK, fmt.Sprintf("%+v", audioInfo))
 }
 
-func getVideoInfo(videoId string) (string, error) {
-	// Make a call to youtube's get_video_info service
-	res, err := http.Get(fmt.Sprintf(`%s?video_id=%s`, youtubeVideoInfoEndpoint, videoId))
+func getAudioStreams(videoId string) ([]string, error) {
+	videoInfoMap, err := getAudioStreamsFromYoutubeVideoInfoEndpoint(fmt.Sprintf(`%s?video_id=%s`, youtubeVideoInfoEndpoint, videoId))
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+
+	// If video is furnished by VEVO or SME, the get_video_info endpoint returns an error
+	if videoInfoMap["status"][0] != "fail" {
+		// All good, no DRM here
+		audioFmtsList := strings.Split(videoInfoMap["adaptive_fmts"][0], ",")
+		return audioFmtsList, nil
+	}
+
+	// TODO: go get video link from youtube
+	// hopefully this takes the same format as get_video_info
+	return nil, fmt.Errorf("Something went wrong")
+}
+
+// Talk about title gore
+// This makes the optimistic assumption that the video will not be VEVO / SME
+func getAudioStreamsFromYoutubeVideoInfoEndpoint(endpoint string) (map[string][]string, error) {
+	res, err := http.Get(endpoint)
+	if err != nil {
+		return nil, err
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return "", err
+		return nil, err
 	}
 
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
-}
-
-// Function name doesn't make a lot of sense in terms of flow
-// This is because we're only interested in grabbing the audio stream
-// For a bit more insight, read the comments below
-func parseAudioInfo(rawVideoInfo string) (map[string][]string, error) {
-	// Now that we've retrieved the video info, time to parse it
-	videoInfoMap, err := url.ParseQuery(rawVideoInfo)
-	if err != nil {
 		return nil, err
 	}
 
-	// FIXME: need to do error checking
-	// When videos are provided by VEVO or Sony Music Entertainment, they aren't retrievable this way
+	videoInfoMap, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil, err
+	}
+	return videoInfoMap, nil
+}
 
-	// The 'adaptive_fmts' value is an array that always has length of 1
-	audioStreamsInfo := strings.Split(videoInfoMap["adaptive_fmts"][0], ",")
+func parseAudioInfo(audioStreamsInfo []string) (map[string][]string, error) {
 	var vorbis map[string][]string
 	var mp4a map[string][]string
 	for _, streamInfo := range audioStreamsInfo {
