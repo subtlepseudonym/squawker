@@ -4,12 +4,18 @@
 [[projects]]
   name = "github.com/subtlepseudonym/go-utils"
   packages = ["http"]
-  revision = "ef37672065336deff8d0584093893b3295abc207"
-  version = "v1.0.1"
+  revision = "f63a794ca4621b8909fa49a477f61ef727c2b043"
+  version = "v1.0.2"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/veandco/go-sdl2"
+  packages = ["mix","sdl"]
+  revision = "4bbd875960a925cb9008f597ef3ed714f85a8372"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "dfd510740df54fd256b10f2bf289218a2ad94443b455b83dee57281a1e4047e4"
+  inputs-digest = "b6ba278a9b1de96be80544f1521ef6a93937437598b2b7d5528d2444a99d2f3b"
   solver-name = "gps-cdcl"
   solver-version = 1
