@@ -10,7 +10,8 @@ import (
 	"github.com/veandco/go-sdl2/mix"
 )
 
-const PreferredFormat string = "mp3"
+// TODO: turn preferredFormat into a flag
+const preferredFormat string = "vorbis"
 const preferredQuality string = "0" // from 0-9 where 0 is best
 const defaultTemplate string = `/%(id)s.%(ext)s`
 
@@ -22,10 +23,19 @@ type AudioFileInfo struct {
 	Stored   bool // is file currently downloaded
 }
 
+var fileExtensions map[string]string = map[string]string{
+	"mp3":    ".mp3",
+	"vorbis": ".ogg",
+}
+
 var dlQueue chan *AudioFileInfo // queue of things to download, buffer size of 1
 var queue chan *AudioFileInfo   // queue of things to play, is buffered
-var nowPlaying AudioFileInfo    // this var is manipulated from music.go FYI
+var nowPlaying *AudioFileInfo   // this var is manipulated from music.go FYI
 var audioLog []AudioFileInfo    // treated like a queue, oldest files are deleted
+
+func GetFileExtension() string {
+	return fileExtensions[preferredFormat]
+}
 
 func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 	dlQueue <- audioFileInfo
@@ -39,7 +49,7 @@ func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 }
 
 func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
-	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", PreferredFormat, "--audio-quality", preferredQuality, "-o", GetAudioFileDirectory()+defaultTemplate, "--", queuedAudioFileInfo.Id)
+	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", preferredFormat, "-o", GetAudioFileDirectory()+defaultTemplate, "--prefer-ffmpeg", "--postprocessor-args", "-ar 48000", "--", queuedAudioFileInfo.Id)
 	var out bytes.Buffer
 	dlCmd.Stdout = &out
 	err := dlCmd.Run()
@@ -47,14 +57,16 @@ func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
 		return err
 	}
 
+	queuedAudioFileInfo.Stored = true
 	log.Printf("DL: complete %s\n", queuedAudioFileInfo.Id)
+	return nil
 }
 
 func DequeueAudioInfo() *AudioFileInfo {
 	return <-queue
 }
 
-func GetNowPlaying() AudioFileInfo {
+func GetNowPlaying() *AudioFileInfo {
 	return nowPlaying
 }
 
@@ -65,18 +77,18 @@ func GetFromLog(idx int) (*AudioFileInfo, error) {
 	return &audioLog[idx], nil
 }
 
+// Doesn't contain a newline at the end of the string (use with Println)
 func GetPrettyAudioLogString(limit int) string {
 	var buf bytes.Buffer
-	buf.WriteString("-   ")
-	for i := 0; i < limit; i++ {
-		fileInfo, err := GetFromLog(i)
-		if err != nil {
+	for i, log := range audioLog {
+		if i >= limit-1 {
 			break
 		}
-		buf.WriteString(fileInfo.Id)
-		buf.WriteString(" - ")
-		buf.WriteString(fileInfo.Title)
-		buf.WriteString("\n-   ")
+		buf.WriteString("\n")
+		buf.WriteString("-   ")
+		buf.WriteString(log.Id)
+		buf.WriteString(" | ")
+		buf.WriteString(log.Title)
 	}
 	return buf.String()
 }
@@ -91,7 +103,7 @@ func addToLog(a AudioFileInfo) {
 	if len(audioLog) < GetFileBacklogSize() {
 		return
 	}
-	fileInfoToPrune := audioLog[GetFileBacklogSize()]
+	fileInfoToPrune := audioLog[GetFileBacklogSize()-1]
 	if fileInfoToPrune.Stored {
 		err := os.Remove(fileInfoToPrune.Filename)
 		if err != nil {

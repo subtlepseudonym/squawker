@@ -9,8 +9,9 @@ import (
 
 const fadeTime int = 1000 // in milliseconds
 const mixFlags int = mix.INIT_OGG | mix.INIT_MP3
-const defaultFrequency int = 44100
-const defaultChunkSize int = 1024
+const defaultFrequency int = 48000
+const defaultAudioFormat uint16 = sdl.AUDIO_F32SYS
+const defaultChunkSize int = 2048 // higher numbers are fine for music
 
 // PlayNext() blocks, so we don't want multiple instances running at once
 var playNextAlreadyQueued bool = false
@@ -25,9 +26,12 @@ func PlayNext() {
 
 	queuedAudioFileInfo := DequeueAudioInfo()
 	lastAudioFileInfo := GetNowPlaying()
-	lastAudioFileInfo.Mus.Free()
+	if lastAudioFileInfo != nil {
+		lastAudioFileInfo.Mus.Free()
+		addToLog(*lastAudioFileInfo)
+	}
 
-	nowPlaying = *queuedAudioFileInfo
+	nowPlaying = queuedAudioFileInfo
 	mus, err := mix.LoadMUS(nowPlaying.Filename)
 	if err != nil {
 		log.Printf("Error loading music file %s\n", nowPlaying.Filename)
@@ -36,9 +40,7 @@ func PlayNext() {
 	mus.FadeIn(1, fadeTime)
 
 	log.Printf("Now playing: %s\n", nowPlaying.Title)
-	addToLog(lastAudioFileInfo)
-	log.Println("Log --")
-	log.Println(GetPrettyAudioLogString(5))
+	log.Println("Log --", GetPrettyAudioLogString(5))
 
 	playNextAlreadyQueued = false
 }
@@ -57,7 +59,7 @@ func init() {
 	}
 
 	// Default values are 22050, AUDIO_S16SYS, 2, 1024
-	err = mix.OpenAudio(defaultFrequency, mix.DEFAULT_FORMAT, mix.DEFAULT_CHANNELS, defaultChunkSize)
+	err = mix.OpenAudio(defaultFrequency, defaultAudioFormat, mix.DEFAULT_CHANNELS, defaultChunkSize)
 	if err != nil {
 		panic(err)
 	}

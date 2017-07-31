@@ -18,7 +18,7 @@ const checkAudioStatusFrequency = 250 // every 250 ms (roughly)
 
 func checkAudioStatus() {
 	for {
-		if !mix.PlayingMusic() {
+		if !mix.PlayingMusic() && mix.FadingMusic() == mix.NO_FADING {
 			util.PlayNext()
 		}
 		time.Sleep(checkAudioStatusFrequency * time.Millisecond)

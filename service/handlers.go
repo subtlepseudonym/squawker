@@ -41,7 +41,7 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		serv.SimpleHttpResponse(w, http.StatusBadRequest, fmt.Sprintf(`The 'video' parameter must match "%s"`, videoIdRegex))
 		return
 	}
-	log.Printf("Add received for %s\n", videoId)
+	log.Printf("AD: received %s\n", videoId)
 
 	title, err := getVideoTitle(videoId)
 	if err != nil {
@@ -51,7 +51,7 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 
 	toQueue := util.AudioFileInfo{
 		Id:       videoId,
-		Filename: fmt.Sprintf("%s/%s.%s", util.GetAudioFileDirectory(), videoId, util.PreferredFormat),
+		Filename: fmt.Sprintf("%s/%s%s", util.GetAudioFileDirectory(), videoId, util.GetFileExtension()),
 		Title:    title,
 		Stored:   false,
 	}
