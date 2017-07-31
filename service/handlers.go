@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	// "strconv"
 
 	serv "github.com/subtlepseudonym/go-utils/http"
 
@@ -12,6 +13,9 @@ import (
 )
 
 const videoIdRegex string = `[[:word:]-]{11}`
+const durationRegexStr string = `:??[0-9]{0,2}:??`
+
+var durationRegex *regexp.Regexp
 
 // TODO: add a logger and get to it
 
@@ -52,11 +56,23 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		Stored:   false,
 	}
 
-	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%+v", toQueue))
+	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%s", toQueue.Title))
 	go util.EnqueueAudioInfo(&toQueue)
 }
 
 func NextHandler(w http.ResponseWriter, r *http.Request) {
 	serv.SimpleHttpResponse(w, http.StatusOK, "Attempting to play next audio file")
 	go util.PlayNext()
+}
+
+// func parseDuration(dur string) int {
+// 	matches := durationRegex.FindAllStringSubmatch(duration, -1)
+// 	var matches_int []int
+// 	for _, match := range matches {
+// 		num, err :=
+// 	}
+// }
+
+func init() {
+	durationRegex = regexp.MustCompile(durationRegexStr)
 }

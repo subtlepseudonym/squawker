@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/veandco/go-sdl2/mix"
 )
 
 const PreferredFormat string = "mp3"
@@ -16,6 +18,7 @@ type AudioFileInfo struct {
 	Id       string // this is the id from youtube
 	Filename string
 	Title    string
+	Mus      *mix.Music
 	Stored   bool // is file currently downloaded
 }
 
@@ -26,22 +29,25 @@ var audioLog []AudioFileInfo    // treated like a queue, oldest files are delete
 
 func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 	dlQueue <- audioFileInfo
-	log.Printf("Downloading %s\n", audioFileInfo.Id)
-	downloadAudioFile(audioFileInfo)
+	log.Printf("DL: starting %s\n", audioFileInfo.Id)
+	err := downloadAudioFile(audioFileInfo)
+	if err != nil {
+		<-dlQueue // FIXME: this is just lazy
+		return
+	}
 	queue <- <-dlQueue // this is the dumbest looking syntax
 }
 
-func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) {
-	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", PreferredFormat, "--audio-quality", preferredQuality, "-o", GetAudioFileDirectory()+defaultTemplate, queuedAudioFileInfo.Id)
+func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
+	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", PreferredFormat, "--audio-quality", preferredQuality, "-o", GetAudioFileDirectory()+defaultTemplate, "--", queuedAudioFileInfo.Id)
 	var out bytes.Buffer
 	dlCmd.Stdout = &out
 	err := dlCmd.Run()
 	if err != nil {
-		// start screaming?
-		return
+		return err
 	}
 
-	log.Printf("Downloaded %s\n", queuedAudioFileInfo.Id)
+	log.Printf("DL: complete %s\n", queuedAudioFileInfo.Id)
 }
 
 func DequeueAudioInfo() *AudioFileInfo {
@@ -57,6 +63,22 @@ func GetFromLog(idx int) (*AudioFileInfo, error) {
 		return nil, fmt.Errorf("Index out of bounds: requested %d, length of log is %d", idx, len(audioLog))
 	}
 	return &audioLog[idx], nil
+}
+
+func GetPrettyAudioLogString(limit int) string {
+	var buf bytes.Buffer
+	buf.WriteString("-   ")
+	for i := 0; i < limit; i++ {
+		fileInfo, err := GetFromLog(i)
+		if err != nil {
+			break
+		}
+		buf.WriteString(fileInfo.Id)
+		buf.WriteString(" - ")
+		buf.WriteString(fileInfo.Title)
+		buf.WriteString("\n-   ")
+	}
+	return buf.String()
 }
 
 func addToLog(a AudioFileInfo) {
