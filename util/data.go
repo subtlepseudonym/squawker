@@ -1,20 +1,22 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
+	"os/exec"
 )
+
+const PreferredFormat string = "mp3"
+const preferredQuality string = "0" // from 0-9 where 0 is best
+const defaultTemplate string = `/%(id)s.%(ext)s`
 
 type AudioFileInfo struct {
 	Id       string // this is the id from youtube
 	Filename string
-	Bitrate  int
-	Length   int  // length in seconds
+	Title    string
 	Stored   bool // is file currently downloaded
-	Url      string
 }
 
 var dlQueue chan *AudioFileInfo // queue of things to download, buffer size of 1
@@ -30,32 +32,15 @@ func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 }
 
 func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) {
-	if queuedAudioFileInfo == nil {
-		// TODO: just keep the queue full with suggested tracks or something similar
-		return // need to wait until another song is added
-	}
-
-	res, err := http.Get(queuedAudioFileInfo.Url)
+	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", PreferredFormat, "--audio-quality", preferredQuality, "-o", GetAudioFileDirectory()+defaultTemplate, queuedAudioFileInfo.Id)
+	var out bytes.Buffer
+	dlCmd.Stdout = &out
+	err := dlCmd.Run()
 	if err != nil {
-		// TODO: log, this is really not good, skip song?
+		// start screaming?
 		return
 	}
 
-	log.Println("Creating file")
-	newAudioFile, err := os.Create(fmt.Sprintf("%s/%s", GetAudioFileDirectory(), queuedAudioFileInfo.Filename))
-	if err != nil {
-		// TODO: log, this is not good, likely filename is already taken, prune old files?
-		return
-	}
-	log.Println("File created")
-
-	defer res.Body.Close()
-	_, err = io.Copy(newAudioFile, res.Body)
-	if err != nil {
-		// TODO: log, skip to next
-		return
-	}
-	queuedAudioFileInfo.Stored = true
 	log.Printf("Downloaded %s\n", queuedAudioFileInfo.Id)
 }
 

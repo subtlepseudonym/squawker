@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 
 	serv "github.com/subtlepseudonym/go-utils/http"
 
@@ -40,37 +39,17 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Add received for %s\n", videoId)
 
-	audioStreams, title, err := getAudioStreams(videoId)
-	if err != nil || audioStreams == nil {
-		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error getting audio stream info")
-		return
-	}
-
-	// TODO: remember to do some logging with bitrate / codec etc
-	audioInfo, err := parseAudioInfo(audioStreams)
+	title, err := getVideoTitle(videoId)
 	if err != nil {
-		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error parsing audio stream info")
-		return
-	}
-
-	bitrate, err := strconv.Atoi(audioInfo["bitrate"][0])
-	if err != nil {
-		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "Received unparseable bitrate value from youtube video info")
-		return
-	}
-	length, err := strconv.Atoi(audioInfo["clen"][0])
-	if err != nil {
-		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "Received unparseable length value from youtube video info")
+		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error getting video title")
 		return
 	}
 
 	toQueue := util.AudioFileInfo{
 		Id:       videoId,
-		Filename: title,
-		Bitrate:  bitrate,
-		Length:   length,
+		Filename: fmt.Sprintf("%s/%s.%s", util.GetAudioFileDirectory(), videoId, util.PreferredFormat),
+		Title:    title,
 		Stored:   false,
-		Url:      audioInfo["url"][0],
 	}
 
 	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%+v", toQueue))
