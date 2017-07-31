@@ -9,6 +9,7 @@ import (
 
 const fadeTime int = 1000 // in milliseconds
 const mixFlags int = mix.INIT_OGG | mix.INIT_MP3
+const defaultFrequency int = 44100
 
 // This function assumes that the next QueuedAudioInfo has already been downloaded
 func PlayNext() {
@@ -23,7 +24,7 @@ func PlayNext() {
 	if err != nil {
 		log.Printf("Error loading music file %s\n", nowPlaying.Filename)
 	}
-	mus.Play(-1)
+	mus.FadeIn(1, fadeTime)
 
 	log.Printf("Now playing: %s\n", nowPlaying.Title)
 	addToLog(lastAudioFileInfo)
@@ -44,7 +45,7 @@ func init() {
 	}
 
 	// Default values are 22050, AUDIO_S16SYS, 2, 1024
-	err = mix.OpenAudio(mix.DEFAULT_FREQUENCY, mix.DEFAULT_FORMAT, mix.DEFAULT_CHANNELS, mix.DEFAULT_CHUNKSIZE)
+	err = mix.OpenAudio(defaultFrequency, mix.DEFAULT_FORMAT, mix.DEFAULT_CHANNELS, mix.DEFAULT_CHUNKSIZE)
 	if err != nil {
 		panic(err)
 	}
