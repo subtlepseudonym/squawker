@@ -6,26 +6,21 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
-	"github.com/veandco/go-sdl2/mix"
+	"github.com/adrg/libvlc-go"
 )
 
-// TODO: turn preferredFormat into a flag
-const preferredFormat string = "vorbis"
 const preferredQuality string = "0" // from 0-9 where 0 is best
 const defaultTemplate string = `/%(id)s.%(ext)s`
+const audioOutputSubstring string = `[ffmpeg]` // ffmpeg output will have the filename in it
 
 type AudioFileInfo struct {
 	Id       string // this is the id from youtube
 	Filename string
 	Title    string
-	Mus      *mix.Music
+	Media    *vlc.Media
 	Stored   bool // is file currently downloaded
-}
-
-var fileExtensions map[string]string = map[string]string{
-	"mp3":    ".mp3",
-	"vorbis": ".ogg",
 }
 
 var dlQueue chan *AudioFileInfo // queue of things to download, buffer size of 1
@@ -33,15 +28,11 @@ var queue chan *AudioFileInfo   // queue of things to play, is buffered
 var nowPlaying *AudioFileInfo   // this var is manipulated from music.go FYI
 var audioLog []AudioFileInfo    // treated like a queue, oldest files are deleted
 
-func GetFileExtension() string {
-	return fileExtensions[preferredFormat]
-}
-
 func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 	dlQueue <- audioFileInfo
-	log.Printf("DL: starting %s\n", audioFileInfo.Id)
 	err := downloadAudioFile(audioFileInfo)
 	if err != nil {
+		log.Println("ERR: ", err.Error())
 		<-dlQueue // FIXME: this is just lazy
 		return
 	}
@@ -49,7 +40,7 @@ func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 }
 
 func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
-	dlCmd := exec.Command("youtube-dl", "-x", "--audio-format", preferredFormat, "-o", GetAudioFileDirectory()+defaultTemplate, "--prefer-ffmpeg", "--postprocessor-args", "-ar 48000", "--", queuedAudioFileInfo.Id)
+	dlCmd := exec.Command("youtube-dl", "-x", "-o", GetAudioFileDirectory()+defaultTemplate, "--prefer-ffmpeg", "--postprocessor-args", "-ar 48000", "--", queuedAudioFileInfo.Id)
 	var out bytes.Buffer
 	dlCmd.Stdout = &out
 	err := dlCmd.Run()
@@ -57,9 +48,31 @@ func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
 		return err
 	}
 
+	filePath, err := parseFilePath(out.String())
+	if err != nil {
+		return err
+	}
+	queuedAudioFileInfo.Filename = filePath
 	queuedAudioFileInfo.Stored = true
-	log.Printf("DL: complete %s\n", queuedAudioFileInfo.Id)
 	return nil
+}
+
+// FIXME: there has GOT to be a better way to do this
+func parseFilePath(cmdOutput string) (string, error) {
+	outputLines := strings.Split(cmdOutput, "\n")
+	for _, line := range outputLines {
+		if !strings.Contains(line, audioOutputSubstring) {
+			continue
+		}
+		ffmpegOutputSlices := strings.Split(line, " ")
+		for _, slice := range ffmpegOutputSlices {
+			if strings.Contains(slice, GetAudioFileDirectory()) {
+				// Need to trim " characters because they're in the output when file ext is .m4a
+				return strings.Trim(slice, `"`), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Unable to parse filename from youtube-dl output: %s\n", cmdOutput)
 }
 
 func DequeueAudioInfo() *AudioFileInfo {
@@ -81,7 +94,7 @@ func GetFromLog(idx int) (*AudioFileInfo, error) {
 func GetPrettyAudioLogString(limit int) string {
 	var buf bytes.Buffer
 	for i, log := range audioLog {
-		if i >= limit-1 {
+		if i >= limit {
 			break
 		}
 		buf.WriteString("\n")
@@ -90,6 +103,7 @@ func GetPrettyAudioLogString(limit int) string {
 		buf.WriteString(" | ")
 		buf.WriteString(log.Title)
 	}
+	buf.WriteString("\n")
 	return buf.String()
 }
 

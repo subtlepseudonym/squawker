@@ -6,34 +6,34 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/adrg/libvlc-go"
 	serv "github.com/subtlepseudonym/go-utils/http"
-	"github.com/veandco/go-sdl2/mix"
-	"github.com/veandco/go-sdl2/sdl"
 
 	"squawker/service"
 	"squawker/util"
 )
 
-const checkAudioStatusFrequency = 250 // every 250 ms (roughly)
+var currentMedia *vlc.Media
 
-func checkAudioStatus() {
+func checkForAndPlayNext() {
 	for {
-		if !mix.PlayingMusic() && mix.FadingMusic() == mix.NO_FADING {
+		if util.GetMedia() == currentMedia {
+			// When checkForAndPlayNext() is first called, this blocks (because util.GetMedia() and currentMedia are both nil)
 			util.PlayNext()
+			time.Sleep(time.Second) // player must start playing, or util.GetMediaLength() returns 0
 		}
-		time.Sleep(checkAudioStatusFrequency * time.Millisecond)
+		currentMedia = util.GetMedia()
+		time.Sleep(time.Duration(util.GetMediaLength()) * time.Millisecond)
 	}
 }
 
 func main() {
-	defer sdl.Quit()
-	serv.LogPublicIpAddress(nil, util.GetPort())
-
-	// Check audio status every
-	go checkAudioStatus()
+	defer util.CleanUp()
+	go checkForAndPlayNext()
 
 	http.HandleFunc("/add", service.AddHandler)
 	http.HandleFunc("/next", service.NextHandler)
 
+	serv.LogPublicIpAddress(nil, util.GetPort())
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", util.GetPort()), nil))
 }

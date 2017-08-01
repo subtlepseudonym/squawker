@@ -3,15 +3,11 @@ package util
 import (
 	"log"
 
-	"github.com/veandco/go-sdl2/mix"
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/adrg/libvlc-go"
 )
 
-const fadeTime int = 1000 // in milliseconds
-const mixFlags int = mix.INIT_OGG | mix.INIT_MP3
-const defaultFrequency int = 48000
-const defaultAudioFormat uint16 = sdl.AUDIO_F32SYS
-const defaultChunkSize int = 2048 // higher numbers are fine for music
+var vlcPlayer *vlc.Player
+var mediaList *vlc.MediaList
 
 // PlayNext() blocks, so we don't want multiple instances running at once
 var playNextAlreadyQueued bool = false
@@ -27,17 +23,29 @@ func PlayNext() {
 	queuedAudioFileInfo := DequeueAudioInfo()
 	lastAudioFileInfo := GetNowPlaying()
 	if lastAudioFileInfo != nil {
-		lastAudioFileInfo.Mus.Free()
+		lastAudioFileInfo.Media.Release()
 		addToLog(*lastAudioFileInfo)
 	}
-
 	nowPlaying = queuedAudioFileInfo
-	mus, err := mix.LoadMUS(nowPlaying.Filename)
+
+	media, err := vlc.NewMediaFromPath(nowPlaying.Filename)
 	if err != nil {
-		log.Printf("Error loading music file %s\n", nowPlaying.Filename)
+		log.Printf("Error loading media file ( %s ): %s\n", nowPlaying.Filename, err.Error())
+		return
 	}
-	nowPlaying.Mus = mus
-	mus.FadeIn(1, fadeTime)
+	nowPlaying.Media = media
+
+	err = vlcPlayer.SetMedia(media)
+	if err != nil {
+		// TODO: try to play next song in the queue
+		log.Printf("Error setting media: %s\n", err.Error())
+		return
+	}
+	err = vlcPlayer.Play()
+	if err != nil {
+		log.Printf("Error playing loaded media file: %s\n", err.Error())
+		return
+	}
 
 	log.Printf("Now playing: %s\n", nowPlaying.Title)
 	log.Println("Log --", GetPrettyAudioLogString(5))
@@ -45,21 +53,41 @@ func PlayNext() {
 	playNextAlreadyQueued = false
 }
 
+func GetPlayer() *vlc.Player {
+	return vlcPlayer
+}
+
+func CleanUp() {
+	// Will be deferred in main()
+	vlcPlayer.Stop()
+	mediaList.Release()
+	vlcPlayer.Release()
+}
+
+func PlayerIsPlaying() bool {
+	return vlcPlayer.IsPlaying()
+}
+
+func GetMedia() *vlc.Media {
+	return vlcPlayer.Media()
+}
+
+func GetMediaLength() int {
+	length, err := vlcPlayer.MediaLength()
+	if err != nil {
+		log.Printf("Error getting media length: %s\n", err.Error())
+		return 0 // FIXME: should probably fix this, but currently just using main.go logic to play next song
+	}
+	return length
+}
+
 func init() {
-	// This stuff is pretty sluggish
-	err := sdl.Init(sdl.INIT_AUDIO)
+	err := vlc.Init("--no-video")
 	if err != nil {
-		panic(err)
+		panic(err) // FIXME
 	}
 
-	flags := mixFlags
-	err = mix.Init(flags)
-	if err != nil {
-		panic(err)
-	}
-
-	// Default values are 22050, AUDIO_S16SYS, 2, 1024
-	err = mix.OpenAudio(defaultFrequency, defaultAudioFormat, mix.DEFAULT_CHANNELS, defaultChunkSize)
+	vlcPlayer, err = vlc.NewPlayer()
 	if err != nil {
 		panic(err)
 	}
