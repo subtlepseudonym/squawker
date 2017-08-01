@@ -33,5 +33,5 @@ ids=("${(f@)$(echo $input)}")
 for id in "${ids[@]}"
 do
 	echo "$id"
-	curl "$squawker_endpoint$id" | jq; sleep 1
+	curl "$squawker_endpoint$id" | jq; sleep 0.25
 done

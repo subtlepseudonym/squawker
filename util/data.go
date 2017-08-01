@@ -129,6 +129,7 @@ func addToLog(a AudioFileInfo) {
 	}
 }
 
+// TODO: add functionality to remove songs found in directory that aren't in audioLog, or are and aren't marked stored
 // Depending upon the size of GetFileBacklogSize(), this can get expensive (basically it's garbage collection)
 // In most cases this will never need to be run, but it certainly makes me feel better knowing the functionality exists :D
 func backlogCheck() {

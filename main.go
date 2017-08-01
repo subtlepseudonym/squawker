@@ -19,16 +19,18 @@ func checkForAndPlayNext() {
 	for {
 		if util.GetMedia() == currentMedia {
 			// When checkForAndPlayNext() is first called, this blocks (because util.GetMedia() and currentMedia are both nil)
-			util.PlayNext()
+			util.PlayNext()         // This is where the magic happens
 			time.Sleep(time.Second) // player must start playing, or util.GetMediaLength() returns 0
 		}
 		currentMedia = util.GetMedia()
-		time.Sleep(time.Duration(util.GetMediaLength()) * time.Millisecond)
+		// This multiplies the total media length by the percentage played
+		timeToWaitMs := int(float32(util.GetMediaLength()) * (1.0 - util.GetMediaPosition()))
+		time.Sleep(time.Duration(timeToWaitMs) * time.Millisecond)
 	}
 }
 
 func main() {
-	defer util.CleanUp()
+	defer util.CleanUp() // TODO: write a hook to run this call on ^C
 	go checkForAndPlayNext()
 
 	http.HandleFunc("/add", service.AddHandler)

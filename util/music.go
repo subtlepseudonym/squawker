@@ -14,10 +14,12 @@ var playNextAlreadyQueued bool = false
 
 // This function assumes that the next QueuedAudioInfo has already been downloaded
 func PlayNext() {
+	// TODO: make sure that this is an atomic action
 	if playNextAlreadyQueued {
+		// This avoids having multiple PlayNext() calls blocking
 		return
 	} else {
-		playNextAlreadyQueued = true
+		playNextAlreadyQueued = true // mostly, kind of, almost thread-safe
 	}
 
 	queuedAudioFileInfo := DequeueAudioInfo()
@@ -48,7 +50,7 @@ func PlayNext() {
 	}
 
 	log.Printf("Now playing: %s\n", nowPlaying.Title)
-	log.Println("Log --", GetPrettyAudioLogString(5))
+	// log.Println("Log --", GetPrettyAudioLogString(5))
 
 	playNextAlreadyQueued = false
 }
@@ -57,6 +59,8 @@ func GetPlayer() *vlc.Player {
 	return vlcPlayer
 }
 
+// TODO: should probaby write a clean up func for each file in package util, then call from constants
+// This way I can provide an organized way to clean up vlc and remove audio files
 func CleanUp() {
 	// Will be deferred in main()
 	vlcPlayer.Stop()
@@ -79,6 +83,15 @@ func GetMediaLength() int {
 		return 0 // FIXME: should probably fix this, but currently just using main.go logic to play next song
 	}
 	return length
+}
+
+func GetMediaPosition() float32 {
+	pos, err := vlcPlayer.MediaPosition()
+	if err != nil {
+		log.Printf("Error getting media position: %s\n", err.Error())
+		return 0.0 // FIXME: same reason as above
+	}
+	return pos
 }
 
 func init() {
