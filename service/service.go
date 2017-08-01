@@ -1,11 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"regexp"
-	// "strconv"
+	"strings"
 
 	serv "github.com/subtlepseudonym/go-utils/http"
 
@@ -13,9 +15,9 @@ import (
 )
 
 const videoIdRegex string = `[[:word:]-]{11}`
-const durationRegexStr string = `:??[0-9]{0,2}:??`
 
 var durationRegex *regexp.Regexp
+var playNextChan chan bool
 
 // TODO: add a logger and get to it
 
@@ -61,17 +63,34 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 
 func NextHandler(w http.ResponseWriter, r *http.Request) {
 	serv.SimpleHttpResponse(w, http.StatusOK, "Attempting to play next audio file")
-	go util.PlayNext()
+	go func() {
+		util.PlayNext()
+		// This is an overflowing channel, if chan is full, continue
+		select {
+		case playNextChan <- true:
+		default:
+		}
+	}()
 }
 
-// func parseDuration(dur string) int {
-// 	matches := durationRegex.FindAllStringSubmatch(duration, -1)
-// 	var matches_int []int
-// 	for _, match := range matches {
-// 		num, err :=
-// 	}
-// }
+// TODO: time remaining handler (if for no other reason than testing)
+
+func GetPlayNextChan() chan bool {
+	return playNextChan
+}
+
+func getVideoTitle(videoId string) (string, error) {
+	getTitle := exec.Command("youtube-dl", "-e", "--", videoId)
+	var out bytes.Buffer
+	getTitle.Stdout = &out
+	err := getTitle.Run()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Trim(out.String(), "\n"), nil
+}
 
 func init() {
-	durationRegex = regexp.MustCompile(durationRegexStr)
+	playNextChan = make(chan bool, 1)
 }
