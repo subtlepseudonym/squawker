@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/adrg/libvlc-go"
 )
@@ -23,38 +24,40 @@ type AudioFileInfo struct {
 	Stored   bool // is file currently downloaded
 }
 
-var dlQueue chan *AudioFileInfo // queue of things to download, buffer size of 1
-var queue chan *AudioFileInfo   // queue of things to play, is buffered
-var nowPlaying *AudioFileInfo   // this var is manipulated from music.go FYI
-var audioLog []AudioFileInfo    // treated like a queue, oldest files are deleted
+var dlLock sync.Mutex         // ensures that only one file more than queueSize is downloaded
+var queue chan *AudioFileInfo // queue of things to play, is buffered
+var nowPlaying *AudioFileInfo // this var is manipulated from music.go FYI
+var audioLog []AudioFileInfo  // treated like a ring buffer, oldest files are deleted
 
+// FIXME: don't download songs that are already downloaded (it can causes broken stream errors)
 func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
-	dlQueue <- audioFileInfo
-	err := downloadAudioFile(audioFileInfo)
+	dlLock.Lock()
+	downloadedAudioFileInfo, err := downloadAudioFile(audioFileInfo)
 	if err != nil {
 		log.Println("ERR: ", err.Error())
-		<-dlQueue // FIXME: this is just lazy
+		dlLock.Unlock()
 		return
 	}
-	queue <- <-dlQueue // this is the dumbest looking syntax
+	queue <- downloadedAudioFileInfo
+	dlLock.Unlock()
 }
 
-func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) error {
+func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) (*AudioFileInfo, error) {
 	dlCmd := exec.Command("youtube-dl", "-x", "-o", GetAudioFileDirectory()+defaultTemplate, "--prefer-ffmpeg", "--postprocessor-args", "-ar 48000", "--", queuedAudioFileInfo.Id)
 	var out bytes.Buffer
 	dlCmd.Stdout = &out
 	err := dlCmd.Run()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	filePath, err := parseFilePath(out.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	queuedAudioFileInfo.Filename = filePath
 	queuedAudioFileInfo.Stored = true
-	return nil
+	return queuedAudioFileInfo, nil
 }
 
 // FIXME: there has GOT to be a better way to do this
@@ -107,6 +110,7 @@ func GetPrettyAudioLogString(limit int) string {
 	return buf.String()
 }
 
+// FIXME: if song is added twice and the additions are more than queueSize apart, the second add will get file not found
 func addToLog(a AudioFileInfo) {
 	audioLog = append([]AudioFileInfo{a}, audioLog...)
 	if len(audioLog) > GetLogSize() {
@@ -158,5 +162,4 @@ func init() {
 	}
 
 	queue = make(chan *AudioFileInfo, GetQueueSize())
-	dlQueue = make(chan *AudioFileInfo, 1)
 }

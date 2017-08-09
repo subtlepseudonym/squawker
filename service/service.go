@@ -63,6 +63,7 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 
 func NextHandler(w http.ResponseWriter, r *http.Request) {
 	serv.SimpleHttpResponse(w, http.StatusOK, "Attempting to play next audio file")
+	// TODO: find a way to assess what is / will block and send apropriate response to client
 	go func() {
 		util.PlayNext()
 		// This is an overflowing channel, if chan is full, continue

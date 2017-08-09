@@ -65,8 +65,8 @@ func init() {
 	flag.IntVar(&port, "port", defaultPort, "Set the port where the server listens for incoming connections")
 	flag.IntVar(&queueSize, "queue-size", defaultQueueSize, "Number of audio files to store in queue before playing (larger number means more memory, but fewer blocking goroutines)")
 	flag.IntVar(&logSize, "log-size", defaultLogSize, "Number of audio files to store in log (so they can be replayed)")
-	flag.IntVar(&numFilesMaintained, "backlog-size", defaultNumFilesMaintained, "Only this many files will be stored with oldest files being deleted first")
-	flag.IntVar(&maxSongLength, "max-length", defaultMaxSongLength, "This sets the maximum song length allowed")
+	flag.IntVar(&numFilesMaintained, "num-files", defaultNumFilesMaintained, "Only this many files will be stored with oldest files being deleted first")
+	flag.IntVar(&maxSongLength, "max-length", defaultMaxSongLength, "This sets the maximum song length allowed (in seconds)")
 	flag.StringVar(&fileDirectory, "audio-dir", defaultFileDirectory, "This sets the name of the directory where audio files are stored")
 
 	flag.Parse()
