@@ -9,3 +9,5 @@ You can build squawker from source with
 GOOS=linux GOARCH=amd64 go build -a -o "squawker-$(git describe --abbrev=0 --tags).linux.amd64" main.go
 ```
 This command assumes that you're building for 64-bit linux and that you've fetched this repo's version tags.
+
+NOTE: I apologize in advance to anyone trying to read through the checkForAndPlayNext() and PlayNext() control flow.  The vlc library I chose didn't do all of the things I wanted it to with its ListPlayer, so things got a bit arcane with the workarounds.  A massive refactor is on the list of TODOs
