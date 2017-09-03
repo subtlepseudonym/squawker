@@ -26,7 +26,7 @@ type AudioFileInfo struct {
 }
 
 func (a *AudioFileInfo) Equals(other *AudioFileInfo) bool {
-	return a.Id == other.Id
+	return a.Filename == other.Filename
 }
 
 var dlLock sync.Mutex         // ensures that only one file more than queueSize is downloaded

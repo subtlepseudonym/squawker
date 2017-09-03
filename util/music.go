@@ -49,10 +49,14 @@ func PlayNext() {
 		return
 	}
 
-	log.Printf("Now playing: %s\n", nowPlaying.Title)
+	log.Printf("Now playing: (%s) %s\n", nowPlaying.Duration.String(), nowPlaying.Title)
 	// log.Println("Log --", GetPrettyAudioLogString(5))
 
 	playNextAlreadyQueued = false
+}
+
+func TogglePlayback() error {
+	return vlcPlayer.TogglePause()
 }
 
 func GetPlayer() *vlc.Player {

@@ -16,6 +16,7 @@ const videoIdRegex string = `[[:word:]-]{11}`
 
 var durationRegex *regexp.Regexp
 var playNextChan chan bool
+var togglePlaybackChan chan bool
 
 // TODO: add a logger and get to it
 
@@ -74,10 +75,25 @@ func NextHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func TogglePlaybackHandler(w http.ResponseWriter, r *http.Request) {
+	err := util.TogglePlayback()
+	if err != nil {
+		log.Printf("Error toggling playback: %s\n", err.Error())
+		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "Error toggling playback")
+	} else {
+		togglePlaybackChan <- true
+		serv.SimpleHttpResponse(w, http.StatusOK, "Toggling playback")
+	}
+}
+
 // TODO: time remaining handler (if for no other reason than testing)
 
 func GetPlayNextChan() chan bool {
 	return playNextChan
+}
+
+func GetTogglePlaybackChan() chan bool {
+	return togglePlaybackChan
 }
 
 func getVideoInfo(videoId string) (*ytdl.VideoInfo, error) {
@@ -90,4 +106,5 @@ func getVideoInfo(videoId string) (*ytdl.VideoInfo, error) {
 
 func init() {
 	playNextChan = make(chan bool, 1)
+	togglePlaybackChan = make(chan bool, 1)
 }

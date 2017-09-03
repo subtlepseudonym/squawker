@@ -27,18 +27,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/nareix/bits"
-  packages = [".","pio"]
-  revision = "1f3e16538b2591eae3c20c7863a5123dad67e6f4"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/nareix/joy4"
-  packages = ["av","av/avutil","av/pktque","av/transcode","cgo/ffmpeg","codec","codec/aacparser","codec/fake","codec/h264parser","format","format/aac","format/flv","format/flv/flvio","format/mp4","format/mp4/mp4io","format/rtmp","format/rtsp","format/rtsp/sdp","format/ts","format/ts/tsio"]
-  revision = "261fd7f9b032d3311f149857e2eb9e8fcc16d20c"
-
-[[projects]]
-  branch = "master"
   name = "github.com/rylio/ytdl"
   packages = ["."]
   revision = "bd30f781270fa4d6df59e2a49948cd157030a2c6"
@@ -76,6 +64,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1fa83f2f9b20b063ce32f5cd700e69473b24284da141c7c35795a69f4b979862"
+  inputs-digest = "5786739e7a0f5e60c35ce1fdfcff91c505303d596d728762e247f03c94e5cbdc"
   solver-name = "gps-cdcl"
   solver-version = 1
