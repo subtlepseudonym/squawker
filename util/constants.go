@@ -2,6 +2,7 @@ package util
 
 import (
 	"flag"
+	"fmt"
 	"os"
 )
 
@@ -44,7 +45,7 @@ func GetLogSize() int {
 	return logSize
 }
 
-func GetFileBacklogSize() int {
+func GetNumFilesMaintained() int {
 	return numFilesMaintained
 }
 
@@ -70,6 +71,11 @@ func init() {
 	flag.StringVar(&fileDirectory, "audio-dir", defaultFileDirectory, "This sets the name of the directory where audio files are stored")
 
 	flag.Parse()
+
+	if numFilesMaintained > logSize {
+		fmt.Printf("ERROR: num-files (%d) may not be larger than log-size (%d)", numFilesMaintained, logSize)
+		os.Exit(2)
+	}
 
 	// Tougher to read, but easier to use
 	if vv {

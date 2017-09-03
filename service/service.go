@@ -1,14 +1,12 @@
 package service
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
-	"os/exec"
 	"regexp"
-	"strings"
 
+	"github.com/rylio/ytdl"
 	serv "github.com/subtlepseudonym/go-utils/http"
 
 	"squawker/util"
@@ -47,6 +45,7 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 
 	title, err := getVideoTitle(videoId)
 	if err != nil {
+		log.Printf("Error: %s\n", err.Error())
 		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error getting video title")
 		return
 	}
@@ -81,15 +80,11 @@ func GetPlayNextChan() chan bool {
 }
 
 func getVideoTitle(videoId string) (string, error) {
-	getTitle := exec.Command("youtube-dl", "-e", "--", videoId)
-	var out bytes.Buffer
-	getTitle.Stdout = &out
-	err := getTitle.Run()
+	vid, err := ytdl.GetVideoInfoFromID(videoId)
 	if err != nil {
 		return "", err
 	}
-
-	return strings.Trim(out.String(), "\n"), nil
+	return vid.Title, nil
 }
 
 func init() {

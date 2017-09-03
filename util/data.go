@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"strings"
 	"sync"
 
 	"github.com/adrg/libvlc-go"
+	"github.com/rylio/ytdl"
+	"github.com/satori/go.uuid"
 )
 
 const preferredQuality string = "0" // from 0-9 where 0 is best
-const defaultTemplate string = `/%(id)s.%(ext)s`
-const audioOutputSubstring string = `[ffmpeg]` // ffmpeg output will have the filename in it
+const defaultTemplate string = `/%s.mp4`
 
 type AudioFileInfo struct {
 	Id       string // this is the id from youtube
@@ -24,12 +23,16 @@ type AudioFileInfo struct {
 	Stored   bool // is file currently downloaded
 }
 
+func (a *AudioFileInfo) Equals(other *AudioFileInfo) bool {
+	return a.Id == other.Id
+}
+
 var dlLock sync.Mutex         // ensures that only one file more than queueSize is downloaded
 var queue chan *AudioFileInfo // queue of things to play, is buffered
 var nowPlaying *AudioFileInfo // this var is manipulated from music.go FYI
 var audioLog []AudioFileInfo  // treated like a ring buffer, oldest files are deleted
 
-// FIXME: don't download songs that are already downloaded (it can causes broken stream errors)
+// FIXME: this has to be a better way to check if file is downloaded, id->downloaded map?
 func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 	dlLock.Lock()
 	downloadedAudioFileInfo, err := downloadAudioFile(audioFileInfo)
@@ -42,40 +45,27 @@ func EnqueueAudioInfo(audioFileInfo *AudioFileInfo) {
 	dlLock.Unlock()
 }
 
+// FIXME: The interaction with youtube-dl is not the most transparent thing in the world
 func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) (*AudioFileInfo, error) {
-	dlCmd := exec.Command("youtube-dl", "-x", "-o", GetAudioFileDirectory()+defaultTemplate, "--prefer-ffmpeg", "--postprocessor-args", "-ar 48000", "--", queuedAudioFileInfo.Id)
-	var out bytes.Buffer
-	dlCmd.Stdout = &out
-	err := dlCmd.Run()
+	fileId := uuid.NewV4()
+	vid, err := ytdl.GetVideoInfoFromID(queuedAudioFileInfo.Id)
 	if err != nil {
 		return nil, err
 	}
-
-	filePath, err := parseFilePath(out.String())
+	filePath := fmt.Sprintf(GetAudioFileDirectory()+defaultTemplate, fileId.String())
+	vidFile, err := os.Create(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer vidFile.Close()
+	bestAudio := vid.Formats.Best(ytdl.FormatAudioEncodingKey)
+	err = vid.Download(bestAudio[0], vidFile)
 	if err != nil {
 		return nil, err
 	}
 	queuedAudioFileInfo.Filename = filePath
 	queuedAudioFileInfo.Stored = true
 	return queuedAudioFileInfo, nil
-}
-
-// FIXME: there has GOT to be a better way to do this
-func parseFilePath(cmdOutput string) (string, error) {
-	outputLines := strings.Split(cmdOutput, "\n")
-	for _, line := range outputLines {
-		if !strings.Contains(line, audioOutputSubstring) {
-			continue
-		}
-		ffmpegOutputSlices := strings.Split(line, " ")
-		for _, slice := range ffmpegOutputSlices {
-			if strings.Contains(slice, GetAudioFileDirectory()) {
-				// Need to trim " characters because they're in the output when file ext is .m4a
-				return strings.Trim(slice, `"`), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("Unable to parse filename from youtube-dl output: %s\n", cmdOutput)
 }
 
 func DequeueAudioInfo() *AudioFileInfo {
@@ -118,10 +108,10 @@ func addToLog(a AudioFileInfo) {
 	}
 
 	// Avoiding index out of bounds
-	if len(audioLog) < GetFileBacklogSize() {
+	if len(audioLog) < GetNumFilesMaintained() {
 		return
 	}
-	fileInfoToPrune := audioLog[GetFileBacklogSize()-1]
+	fileInfoToPrune := audioLog[GetNumFilesMaintained()-1]
 	if fileInfoToPrune.Stored {
 		err := os.Remove(fileInfoToPrune.Filename)
 		if err != nil {
@@ -134,11 +124,11 @@ func addToLog(a AudioFileInfo) {
 }
 
 // TODO: add functionality to remove songs found in directory that aren't in audioLog, or are and aren't marked stored
-// Depending upon the size of GetFileBacklogSize(), this can get expensive (basically it's garbage collection)
+// Depending upon the size of GetNumFilesMaintained(), this can get expensive (basically it's garbage collection)
 // In most cases this will never need to be run, but it certainly makes me feel better knowing the functionality exists :D
 func backlogCheck() {
 	for i, fileInfo := range audioLog {
-		if i < GetFileBacklogSize() {
+		if i < GetNumFilesMaintained() {
 			continue
 		}
 
