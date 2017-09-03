@@ -17,16 +17,19 @@ var currentId string
 func checkForAndPlayNext() {
 	nextCalled := service.GetPlayNextChan()
 	for {
+		nowPlaying := util.GetNowPlaying()
 		// Mostly I think this if condition is cumbersome, but it uses well-defined string equality
-		if util.GetNowPlaying() == nil || util.GetNowPlaying().Id == currentId {
+		if nowPlaying == nil || nowPlaying.Id == currentId {
 			// When checkForAndPlayNext() is first called, this blocks (because util.GetMedia() and currentMedia are both nil)
 			util.PlayNext()         // This is where the magic happens
 			time.Sleep(time.Second) // player must start playing, or util.GetMediaLength() returns 0
 		}
-		currentId = util.GetNowPlaying().Id
+		nowPlaying = util.GetNowPlaying()
+		currentId = nowPlaying.Id
 
 		// This multiplies the total media length by the percentage played
-		timeToWaitMs := int(float32(util.GetMediaLength()) * (1.0 - util.GetMediaPosition()))
+		timeToWaitMs := int(nowPlaying.Duration/time.Millisecond) - int(float32(util.GetMediaLength())*util.GetMediaPosition())
+		log.Printf("Duration: %s\n", nowPlaying.Duration.String())
 
 		// This keeps async calls to PlayNext() from leaving us with an awkward pause after songs
 		select {

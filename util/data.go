@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/adrg/libvlc-go"
 	"github.com/rylio/ytdl"
@@ -13,13 +15,13 @@ import (
 )
 
 const preferredQuality string = "0" // from 0-9 where 0 is best
-const defaultTemplate string = `/%s.mp4`
 
 type AudioFileInfo struct {
 	Id       string // this is the id from youtube
 	Filename string
 	Title    string
 	Media    *vlc.Media
+	Duration time.Duration
 	Stored   bool // is file currently downloaded
 }
 
@@ -52,17 +54,28 @@ func downloadAudioFile(queuedAudioFileInfo *AudioFileInfo) (*AudioFileInfo, erro
 	if err != nil {
 		return nil, err
 	}
-	filePath := fmt.Sprintf(GetAudioFileDirectory()+defaultTemplate, fileId.String())
+
+	bestAudio := vid.Formats.Best(ytdl.FormatAudioEncodingKey)
+	var audio ytdl.Format
+	for _, format := range bestAudio {
+		if strings.Contains(format.ValueForKey("type").(string), "audio/") {
+			audio = format
+			break
+		}
+	}
+
+	filePath := fmt.Sprintf("%s/%s.%s", GetAudioFileDirectory(), fileId.String(), audio.Extension)
 	vidFile, err := os.Create(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer vidFile.Close()
-	bestAudio := vid.Formats.Best(ytdl.FormatAudioEncodingKey)
-	err = vid.Download(bestAudio[0], vidFile)
+
+	err = vid.Download(audio, vidFile)
 	if err != nil {
 		return nil, err
 	}
+
 	queuedAudioFileInfo.Filename = filePath
 	queuedAudioFileInfo.Stored = true
 	return queuedAudioFileInfo, nil

@@ -41,19 +41,20 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		serv.SimpleHttpResponse(w, http.StatusBadRequest, fmt.Sprintf(`The 'video' parameter must match "%s"`, videoIdRegex))
 		return
 	}
-	log.Printf("ADD: %s\n", videoId)
 
-	title, err := getVideoTitle(videoId)
+	vidInfo, err := getVideoInfo(videoId)
 	if err != nil {
 		log.Printf("Error: %s\n", err.Error())
 		serv.SimpleHttpResponse(w, http.StatusInternalServerError, "There was an error getting video title")
 		return
 	}
+	log.Printf("ADD: [%s | %s]\n", videoId, vidInfo.Title)
 
 	toQueue := util.AudioFileInfo{
-		Id:     videoId,
-		Title:  title,
-		Stored: false,
+		Id:       videoId,
+		Title:    vidInfo.Title,
+		Duration: vidInfo.Duration,
+		Stored:   false,
 	}
 
 	serv.SimpleHttpResponse(w, http.StatusAccepted, fmt.Sprintf("%s", toQueue.Title))
@@ -79,12 +80,12 @@ func GetPlayNextChan() chan bool {
 	return playNextChan
 }
 
-func getVideoTitle(videoId string) (string, error) {
+func getVideoInfo(videoId string) (*ytdl.VideoInfo, error) {
 	vid, err := ytdl.GetVideoInfoFromID(videoId)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return vid.Title, nil
+	return vid, nil
 }
 
 func init() {
