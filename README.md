@@ -2,12 +2,31 @@
 
 This intention of this project is to the solve the 'too many DJs' problem.  Anytime you've got more than one musically inclined friend over and music is playing, they all want to pick the next song.
 
-Squawker provides a REST endpoint for adding songs, sourced directly from youtube, to a concurrency safe queue which are then played via vlc.  I'm working on reducing the number of external (non-golang) with the ultimate goal of providing a standalong fat binary deployment.
+Squawker receives video IDs from a REST endpoint and adds them to a queue.  Next and previous commands are provided via canonical endpoints.  By default, Squawker begins playing anytime the queue is populated with an unplayed track and doesn't repeat the queue.
 
-You can build squawker from source with 
+You can build squawker from source like so:
+```bash
+go build main.go
+```
+
+Personally, I use the following for more descriptive binary names:
+
 ```bash
 GOOS=linux GOARCH=amd64 go build -a -o "squawker-$(git describe --abbrev=0 --tags).linux.amd64" main.go
 ```
 This command assumes that you're building for 64-bit linux and that you've fetched this repo's version tags.
 
-NOTE: I apologize in advance to anyone trying to read through the checkForAndPlayNext() and PlayNext() control flow.  The vlc library I chose didn't do all of the things I wanted it to with its ListPlayer, so things got a bit arcane with the workarounds.  A massive refactor is on the list of TODOs
+
+#### Example REST Calls ####
+
+Songs can be added to the queue like so:
+```bash
+curl "localhost:15567/add?video=dQw4w9WgXcQ"
+```
+
+Playing the next song:
+`curl "localhost:15567/next"`
+Playing the previous song:
+`curl "localhost:15567/prev"`
+And toggling pause state:
+`curl "localhost:15567/toggle"`
