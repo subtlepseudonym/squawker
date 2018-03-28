@@ -6,7 +6,7 @@ usage() {
 	echo "\t-r, --randomize\tRandomizes song order"
 }
 
-squawker_endpoint="http://localhost:15567/add?video="
+squawker_endpoint="http://localhost:15567/add?v="
 input=$(cat video_ids)
 
 while [ "$1" != "" ]; do

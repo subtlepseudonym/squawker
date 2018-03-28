@@ -29,5 +29,5 @@
 		revision = "2f2c8f68a9474100b6163cd0aa4e8a31b28c558a"
 
 [[constraint]]
-		name = "github.com/satori/go.uuid"
-		version = "v1.2.0"
+		name = "github.com/pkg/errors"
+		revision = "816c9085562cd7ee03e7f8188a1cfd942858cded"

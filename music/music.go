@@ -4,25 +4,33 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/adrg/libvlc-go"
+	"github.com/pkg/errors"
 	"github.com/rylio/ytdl"
-	"github.com/satori/go.uuid"
 )
 
 const videoIDRegex string = `[[:word:]-]{11}`
 const audioFileDir string = "audio_files"
 
 var vlcPlayer *vlc.ListPlayer
-var mediaList *vlc.MediaList
+var audioCache = make(map[string]Audio)
+
+type Audio struct {
+	VideoID  string
+	VideoURL string
+	Title    string
+}
 
 func init() {
-	err := vlc.Init("--no-video")
+	// --mod-megabass
+	// --adaptive-logic {,predictive,nearoptimal,rate,fixedrate,lowest,highest}
+	err := vlc.Init("--no-video", "-q") //, "--sout-mp4-faststart")
 	if err != nil {
-		panic(err) // FIXME
+		panic(err)
 	}
 
 	vlcPlayer, err = vlc.NewListPlayer()
@@ -30,7 +38,7 @@ func init() {
 		panic(err)
 	}
 
-	mediaList, err = vlc.NewMediaList()
+	mediaList, err := vlc.NewMediaList()
 	if err != nil {
 		panic(err)
 	}
@@ -48,7 +56,7 @@ func Teardown() {
 	if err != nil {
 		log.Printf("vlcPlayer.Stop failed: %s\n", err)
 	}
-	err = mediaList.Release()
+	err = vlcPlayer.MediaList().Release()
 	if err != nil {
 		log.Printf("mediaList.Release failed: %s\n", err)
 	}
@@ -60,7 +68,46 @@ func Teardown() {
 
 // statusJSON is just a nice abstraction for marshalling simply JSON objects
 func statusJSON(status int, message string) []byte {
-	return []byte(fmt.Sprintf(`{"status":"%s","msg":"%s"}`, http.StatusText(status), message))
+	return []byte(fmt.Sprintf(`{"status":"%s","msg":%s}`, http.StatusText(status), strconv.Quote(message)))
+}
+
+// getAudio checks the cache, then retrieves video metadata and returns and Audio struct
+func getAudio(videoID string) (*Audio, error) {
+	if a, ok := audioCache[videoID]; ok {
+		return &a, nil
+	}
+
+	videoInfo, err := ytdl.GetVideoInfoFromID(videoID)
+	if err != nil {
+		return nil, errors.Wrap(err, "get video from ID failed")
+	}
+
+	var audio ytdl.Format
+	for _, format := range videoInfo.Formats.Best(ytdl.FormatAudioEncodingKey) {
+		formatStr, ok := format.ValueForKey("type").(string)
+		if !ok {
+			log.Printf("value assertion error: %v", format.ValueForKey("type"))
+			continue
+		}
+		if strings.Contains(formatStr, "audio/") {
+			audio = format
+			break
+		}
+	}
+
+	audioURL, err := videoInfo.GetDownloadURL(audio)
+	if err != nil {
+		return nil, errors.Wrap(err, "get audio URL failed")
+	}
+
+	a := Audio{
+		VideoID:  videoID,
+		VideoURL: audioURL.String(),
+		Title:    videoInfo.Title,
+	}
+
+	audioCache[a.VideoID] = a
+	return &a, nil
 }
 
 // AddHandler uses the ytdl and vlc packages to download requested video's audio tracks
@@ -73,10 +120,10 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	r.ParseForm()
 
-	videoIDArr := r.Form["video"]
+	videoIDArr := r.Form["v"]
 	if videoIDArr == nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write(statusJSON(http.StatusBadRequest, "The 'video' parameter is required"))
+		w.Write(statusJSON(http.StatusBadRequest, "The 'v' parameter is required"))
 		return
 	}
 
@@ -94,57 +141,23 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	videoInfo, err := ytdl.GetVideoInfoFromID(videoID)
+	audio, err := getAudio(videoID)
 	if err != nil {
-		log.Printf("get video from ID failed: %s\n", err)
+		log.Printf("get audio failed: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(statusJSON(http.StatusInternalServerError, "Info retrieval failed"))
+		w.Write(statusJSON(http.StatusInternalServerError, "Get audio failed"))
 		return
 	}
 
-	var audio ytdl.Format
-	for _, format := range videoInfo.Formats.Best(ytdl.FormatAudioEncodingKey) {
-		formatStr, ok := format.ValueForKey("type").(string)
-		if !ok {
-			log.Printf("value assertion error: %v", format.ValueForKey("type"))
-			continue
-		}
-		if strings.Contains(formatStr, "audio/") {
-			audio = format
-			break
-		}
-	}
-
-	filePath := fmt.Sprintf("%s/%s.%s", audioFileDir, uuid.NewV4().String(), audio.Extension)
-	videoFile, err := os.Create(filePath)
-	if err != nil {
-		log.Printf("file creation failed: %s\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(statusJSON(http.StatusInternalServerError, "File creation failed"))
-		return
-	}
-
-	err = videoInfo.Download(audio, videoFile)
-	if err != nil {
-		log.Printf("audio download failed: %s\n", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write(statusJSON(http.StatusInternalServerError, "Audio retrieval failed"))
-		videoFile.Close()
-		err = os.Remove(filePath)
-		if err != nil {
-			log.Printf("remove file failed: %s\n", err)
-		}
-		return
-	}
-	defer videoFile.Close()
-
-	err = mediaList.AddMediaFromPath(filePath)
+	vlcPlayer.MediaList().Lock()
+	err = vlcPlayer.MediaList().AddMediaFromURL(audio.VideoURL)
 	if err != nil {
 		log.Printf("add to media list failed: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(statusJSON(http.StatusInternalServerError, "MediaList add failed"))
 		return
 	}
+	vlcPlayer.MediaList().Unlock()
 
 	if !vlcPlayer.IsPlaying() {
 		err = vlcPlayer.Play()
@@ -156,8 +169,8 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("ADD [%s | %s]\n", videoID, videoInfo.Title)
-	w.Write(statusJSON(http.StatusOK, fmt.Sprintf("Added %s", videoInfo.Title)))
+	log.Printf("ADD [%s | %s]\n", audio.VideoID, audio.Title)
+	w.Write(statusJSON(http.StatusOK, fmt.Sprintf("Added %s", audio.Title)))
 }
 
 // NextHandler attempts to play the next song
@@ -172,6 +185,7 @@ func NextHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(statusJSON(http.StatusOK, "Playing next"))
 }
 
+// PrevHandler attempts to play the previous song
 func PrevHandler(w http.ResponseWriter, r *http.Request) {
 	err := vlcPlayer.PlayPrevious()
 	if err != nil {

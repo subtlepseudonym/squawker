@@ -25,21 +25,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "816c9085562cd7ee03e7f8188a1cfd942858cded"
+
+[[projects]]
   name = "github.com/rylio/ytdl"
   packages = ["."]
   revision = "29c5845309e4f72e72cabbe085f2ad8da3d04109"
-
-[[projects]]
-  name = "github.com/satori/go.uuid"
-  packages = ["."]
-  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
-  version = "v1.2.0"
-
-[[projects]]
-  name = "github.com/subtlepseudonym/go-utils"
-  packages = ["http"]
-  revision = "f63a794ca4621b8909fa49a477f61ef727c2b043"
-  version = "v1.0.2"
 
 [[projects]]
   branch = "master"
@@ -62,6 +55,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b38c45077e2868c523fb682c149bc3d88183abe33f3569934618802cab943c61"
+  inputs-digest = "104069fd727eab9c243daf3099a35187020c7cd8c8e05850c3ff9b14603b7182"
   solver-name = "gps-cdcl"
   solver-version = 1

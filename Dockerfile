@@ -1,12 +1,15 @@
 FROM ubuntu:latest
 
 EXPOSE 15567
-ENV BIN squawker-v0.1.0+1.linux.amd64
+
+ARG PROJECT=squawker
+ARG VERSION=v0.4.0+3
+
 RUN apt-get update && \
     apt-get -y install vlc
 
-WORKDIR /root
-COPY $BIN sq
+WORKDIR /home
+COPY $PROJECT-$VERSION.linux.amd64 sq
 RUN chmod +x sq
 
 CMD ["./sq"]
