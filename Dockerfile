@@ -6,7 +6,7 @@ ARG PROJECT=squawker
 ARG VERSION=v0.4.0+3
 
 RUN apt-get update && \
-    apt-get -y install libvlc-dev vlc-nox
+    apt-get -y install libvlc-dev vlc
 
 WORKDIR /home
 COPY $PROJECT-$VERSION.linux.amd64 sq
