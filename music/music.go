@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/adrg/libvlc-go"
 	"github.com/pkg/errors"
@@ -155,11 +156,13 @@ func AddHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("add to media list failed: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(statusJSON(http.StatusInternalServerError, "MediaList add failed"))
+		vlcPlayer.MediaList().Unlock()
 		return
 	}
 	vlcPlayer.MediaList().Unlock()
 
 	if !vlcPlayer.IsPlaying() {
+		time.Sleep(1 * time.Second)
 		err = vlcPlayer.Play()
 		if err != nil {
 			log.Printf("play failed: %s\n", err)
@@ -206,6 +209,7 @@ func ToggleHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(statusJSON(http.StatusInternalServerError, "Toggle pause failed"))
 		return
 	}
+	time.Sleep(250 * time.Millisecond)
 	pausedStr := "paused"
 	if vlcPlayer.IsPlaying() {
 		pausedStr = "playing"
